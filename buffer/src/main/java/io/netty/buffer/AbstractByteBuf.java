@@ -1086,7 +1086,7 @@ public abstract class AbstractByteBuf extends ByteBuf {
     @Override
     public String toString() {
         if (refCnt() == 0) {
-            return getClass().getSimpleName() + "(freed)";
+            return getClass().getSimpleName() + "(freed) " + super.toString();
         }
 
         StringBuilder buf = new StringBuilder();

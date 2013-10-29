@@ -17,6 +17,7 @@ package io.netty.channel;
 
 import static io.netty.channel.DefaultChannelPipeline.logger;
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.util.DebugLogger;
 import io.netty.util.DefaultAttributeMap;
 import io.netty.util.Recycler;
 import io.netty.util.concurrent.EventExecutor;
@@ -26,6 +27,7 @@ import io.netty.util.internal.StringUtil;
 import java.net.SocketAddress;
 
 final class DefaultChannelHandlerContext extends DefaultAttributeMap implements ChannelHandlerContext {
+    private static final DebugLogger logg = DebugLogger.getLogger("test.log");
 
     volatile DefaultChannelHandlerContext next;
     volatile DefaultChannelHandlerContext prev;
@@ -317,23 +319,29 @@ final class DefaultChannelHandlerContext extends DefaultAttributeMap implements 
             throw new NullPointerException("msg");
         }
 
+        logg.log("fireChannelRead msg " + this);
         final DefaultChannelHandlerContext next = findContextInbound();
         EventExecutor executor = next.executor();
         if (executor.inEventLoop()) {
+            logg.log("invok next directly " + next);
             next.invokeChannelRead(msg);
         } else {
-            executor.execute(new Runnable() {
+            Runnable r = new Runnable() {
                 @Override
                 public void run() {
+                    logg.log(this + " really invoke next: " + next);
                     next.invokeChannelRead(msg);
                 }
-            });
+            };
+            logg.log("invok asycly " + r);
+            executor.execute(r);
         }
         return this;
     }
 
     private void invokeChannelRead(Object msg) {
         try {
+            logg.log("got handler for msg: " + handler);
             ((ChannelInboundHandler) handler).channelRead(this, msg);
         } catch (Throwable t) {
             notifyHandlerException(t);
@@ -671,6 +679,7 @@ final class DefaultChannelHandlerContext extends DefaultAttributeMap implements 
 
     private void invokeFlush() {
         try {
+            logg.log("flushing to handler: " + handler.getClass().getName());
             ((ChannelOutboundHandler) handler).flush(this);
         } catch (Throwable t) {
             notifyHandlerException(t);
@@ -692,14 +701,18 @@ final class DefaultChannelHandlerContext extends DefaultAttributeMap implements 
 
     private void write(Object msg, boolean flush, ChannelPromise promise) {
 
+        logg.log("writing msg(buf): " + msg);
         DefaultChannelHandlerContext next = findContextOutbound();
         EventExecutor executor = next.executor();
         if (executor.inEventLoop()) {
+            logg.log("DefaultChannelHandlerContext, in loop, call next: " + next.getClass().getName());
             next.invokeWrite(msg, promise);
             if (flush) {
                 next.invokeFlush();
+                logg.log("flushed");
             }
         } else {
+            logg.log("DefaultChannelHandlerContext, Not in loop");
             int size = channel.estimatorHandle().size(msg);
             if (size > 0) {
                 ChannelOutboundBuffer buffer = channel.unsafe().outboundBuffer();
@@ -708,7 +721,9 @@ final class DefaultChannelHandlerContext extends DefaultAttributeMap implements 
                     buffer.incrementPendingOutboundBytes(size);
                 }
             }
-            safeExecute(executor, WriteTask.newInstance(next, msg, size, flush, promise), promise);
+            WriteTask task = WriteTask.newInstance(next, msg, size, flush, promise);
+            logg.log("safeExecute task: " + task);
+            safeExecute(executor, task, promise);
         }
     }
 
@@ -888,6 +903,7 @@ final class DefaultChannelHandlerContext extends DefaultAttributeMap implements 
 
         @Override
         public void run() {
+            logg.log("running task: " + this);
             try {
                 if (size > 0) {
                     ChannelOutboundBuffer buffer = ctx.channel.unsafe().outboundBuffer();
@@ -896,9 +912,12 @@ final class DefaultChannelHandlerContext extends DefaultAttributeMap implements 
                         buffer.decrementPendingOutboundBytes(size);
                     }
                 }
+                logg.log("invokeWrite on ctx: " + ctx.getClass().getName());
                 ctx.invokeWrite(msg, promise);
                 if (flush) {
+                    logg.log("invokeFlush on ctx: " + ctx.getClass().getName());
                     ctx.invokeFlush();
+                    logg.log("Flushed");
                 }
             } finally {
                 // Set to null so the GC can collect them directly

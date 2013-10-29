@@ -25,6 +25,7 @@ import io.netty.channel.ChannelPipeline;
 import io.netty.channel.FileRegion;
 import io.netty.channel.RecvByteBufAllocator;
 import io.netty.channel.socket.ChannelInputShutdownEvent;
+import io.netty.util.DebugLogger;
 import io.netty.util.internal.StringUtil;
 
 import java.io.IOException;
@@ -35,6 +36,7 @@ import java.nio.channels.SelectionKey;
  * {@link AbstractNioChannel} base class for {@link Channel}s that operate on bytes.
  */
 public abstract class AbstractNioByteChannel extends AbstractNioChannel {
+    private static final DebugLogger logg = DebugLogger.getLogger("test.log");
     private Runnable flushTask;
 
     /**
@@ -57,6 +59,7 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
 
         @Override
         public void read() {
+            logg.log("reading NioByteUnsafe: " + this);
             assert eventLoop().inEventLoop();
             final SelectionKey key = selectionKey();
             final ChannelConfig config = config();
@@ -98,10 +101,13 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
                         break;
                     }
 
+                    logg.log(this + " just read a byteBuf " + dumpBytes(byteBuf));
                     pipeline.fireChannelRead(byteBuf);
+                    logg.log("fired " + byteBuf.getClass().getName());
                     allocHandle.record(localReadAmount);
                     byteBuf = null;
                     if (++ messages == maxMessagesPerRead) {
+                        //logg.log("break loop because max reached. " + maxMessagesPerRead);
                         break;
                     }
                 }
@@ -138,6 +144,19 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
                     }
                 }
             }
+        }
+
+        protected String dumpBytes(ByteBuf byteBuf) {
+           ByteBuf copy = byteBuf.copy();
+           StringBuilder sb = new StringBuilder("[");
+           int n = copy.readableBytes();
+           byte[] content = new byte[n];
+           copy.readBytes(content);
+           for (int i = 0; i < n; i++) {
+              sb.append(content[i]);
+           }
+           sb.append("]");
+           return sb.toString();
         }
     }
 

@@ -19,6 +19,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.util.DebugLogger;
 import io.netty.util.internal.RecyclableArrayList;
 import io.netty.util.internal.StringUtil;
 
@@ -45,6 +46,7 @@ import java.util.List;
  * annotated with {@link @Sharable}.
  */
 public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter {
+    private static final DebugLogger logg = DebugLogger.getLogger("test.log");
 
     ByteBuf cumulation;
     private boolean singleDecode;
@@ -121,14 +123,18 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+        logg.log(this + " channelRead()");
         RecyclableArrayList out = RecyclableArrayList.newInstance();
         try {
             if (msg instanceof ByteBuf) {
+                logg.log("msg is ByteBuf, cumulation: " + cumulation);
                 ByteBuf data = (ByteBuf) msg;
                 if (cumulation == null) {
+                    logg.log("cumulation is null so assign new");
                     cumulation = data;
                     try {
                         callDecode(ctx, cumulation, out);
+                        logg.log("callDecoded, out size now: " + out.size());
                     } finally {
                         if (cumulation != null && !cumulation.isReadable()) {
                             cumulation.release();
@@ -136,8 +142,11 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
                         }
                     }
                 } else {
+                    logg.log("cumulation not null");
                     try {
                         if (cumulation.writerIndex() > cumulation.maxCapacity() - data.readableBytes()) {
+                            logg.log("old cumulation not big enough: " + cumulation.writerIndex() +
+                                " " + cumulation.maxCapacity() + " " + data.readableBytes());
                             ByteBuf oldCumulation = cumulation;
                             cumulation = ctx.alloc().buffer(oldCumulation.readableBytes() + data.readableBytes());
                             cumulation.writeBytes(oldCumulation);
@@ -145,6 +154,7 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
                         }
                         cumulation.writeBytes(data);
                         callDecode(ctx, cumulation, out);
+                        logg.log("out size after callDecode : " + out.size());
                     } finally {
                         if (cumulation != null) {
                             if (!cumulation.isReadable()) {
@@ -161,15 +171,19 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
                 out.add(msg);
             }
         } catch (DecoderException e) {
+            logg.log("xxxxx got decode exception ", false, e);
             throw e;
         } catch (Throwable t) {
+            logg.log("xxxxx got throwable", false, t);
             throw new DecoderException(t);
         } finally {
             int size = out.size();
+            logg.log("findlaly size " + size);
             if (size == 0) {
                 decodeWasNull = true;
             } else {
                 for (int i = 0; i < size; i ++) {
+                    logg.log("fire read back to ctx: " + ctx);
                     ctx.fireChannelRead(out.get(i));
                 }
             }
@@ -225,22 +239,27 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
      * @param out           the {@link List} to which decoded messages should be added
      */
     protected void callDecode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) {
+        logg.log(this + " in callDecode() " + in.isReadable());
         try {
             while (in.isReadable()) {
                 int outSize = out.size();
                 int oldInputLength = in.readableBytes();
                 decode(ctx, in, out);
 
+                logg.log("decode() done once, out: " + out.size());
+
                 // Check if this handler was removed before continuing the loop.
                 // If it was removed, it is not safe to continue to operate on the buffer.
                 //
                 // See https://github.com/netty/netty/issues/1664
                 if (ctx.isRemoved()) {
+                    logg.log("removed, break");
                     break;
                 }
 
                 if (outSize == out.size()) {
                     if (oldInputLength == in.readableBytes()) {
+                        logg.log("strange case, break");
                         break;
                     } else {
                         continue;
@@ -254,6 +273,7 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
                 }
 
                 if (isSingleDecode()) {
+                    logg.log("singleDecode(), break");
                     break;
                 }
             }

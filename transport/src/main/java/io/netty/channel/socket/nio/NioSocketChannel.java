@@ -28,6 +28,7 @@ import io.netty.channel.nio.AbstractNioByteChannel;
 import io.netty.channel.socket.DefaultSocketChannelConfig;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannelConfig;
+import io.netty.util.DebugLogger;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -40,6 +41,7 @@ import java.nio.channels.SocketChannel;
  * {@link io.netty.channel.socket.SocketChannel} which uses NIO selector based implementation.
  */
 public class NioSocketChannel extends AbstractNioByteChannel implements io.netty.channel.socket.SocketChannel {
+    private static final DebugLogger logg = DebugLogger.getLogger("test.log");
 
     private static final ChannelMetadata METADATA = new ChannelMetadata(false);
 
@@ -211,11 +213,28 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
     @Override
     protected int doWriteBytes(ByteBuf buf) throws Exception {
         final int expectedWrittenBytes = buf.readableBytes();
+        logg.log("nio socket channel writebytes, expected: " +
+            expectedWrittenBytes + " buf: " + dumpBytes(buf));
+
         final int writtenBytes = buf.readBytes(javaChannel(), expectedWrittenBytes);
+        logg.log("written : " + writtenBytes);
         return writtenBytes;
     }
 
-    @Override
+    protected String dumpBytes(ByteBuf byteBuf) {
+       ByteBuf copy = byteBuf.copy();
+       StringBuilder sb = new StringBuilder("[");
+       int n = copy.readableBytes();
+       byte[] content = new byte[n];
+       copy.readBytes(content);
+       for (int i = 0; i < n; i++) {
+          sb.append(content[i]);
+       }
+       sb.append("]");
+       return sb.toString();
+    }
+
+   @Override
     protected long doWriteFileRegion(FileRegion region) throws Exception {
         final long position = region.transfered();
         final long writtenBytes = region.transferTo(javaChannel(), position);

@@ -16,6 +16,7 @@
 package io.netty.channel;
 
 import io.netty.channel.Channel.Unsafe;
+import io.netty.util.DebugLogger;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.concurrent.EventExecutorGroup;
@@ -42,6 +43,7 @@ import java.util.concurrent.Future;
  * by a {@link Channel} implementation when the {@link Channel} is created.
  */
 final class DefaultChannelPipeline implements ChannelPipeline {
+    private static final DebugLogger logg = DebugLogger.getLogger("test.log");
 
     static final InternalLogger logger = InternalLoggerFactory.getInstance(DefaultChannelPipeline.class);
 
@@ -782,6 +784,7 @@ final class DefaultChannelPipeline implements ChannelPipeline {
 
     @Override
     public ChannelPipeline fireChannelRead(Object msg) {
+        logg.log("firing msg to head.");
         head.fireChannelRead(msg);
         return this;
     }

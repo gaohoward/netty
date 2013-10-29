@@ -15,6 +15,7 @@
  */
 package io.netty.util.concurrent;
 
+import io.netty.util.DebugLogger;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
 
@@ -39,6 +40,7 @@ import java.util.concurrent.TimeUnit;
  *
  */
 public abstract class SingleThreadEventExecutor extends AbstractEventExecutor {
+    private static final DebugLogger logg = DebugLogger.getLogger("test.log");
 
     private static final InternalLogger logger =
             InternalLoggerFactory.getInstance(SingleThreadEventExecutor.class);
@@ -85,6 +87,7 @@ public abstract class SingleThreadEventExecutor extends AbstractEventExecutor {
     protected SingleThreadEventExecutor(
             EventExecutorGroup parent, ThreadFactory threadFactory, boolean addTaskWakesUp) {
 
+        logg.log("new (maybe NioEventLoop): " + this, true);
         if (threadFactory == null) {
             throw new NullPointerException("threadFactory");
         }
@@ -809,6 +812,7 @@ public abstract class SingleThreadEventExecutor extends AbstractEventExecutor {
                 delayedTaskQueue.add(new ScheduledFutureTask<Void>(
                         this, delayedTaskQueue, Executors.<Void>callable(new PurgeTask(), null),
                         ScheduledFutureTask.deadlineNanos(SCHEDULE_PURGE_INTERVAL), -SCHEDULE_PURGE_INTERVAL));
+                logg.log(this + "starting the thread: " + thread + "t" + thread.getId() + "t", true);
                 thread.start();
             }
         }

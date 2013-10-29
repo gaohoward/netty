@@ -1870,7 +1870,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * {@link #writerIndex()} and {@link #capacity()}.
      */
     @Override
-    public abstract String toString();
+    public String toString() {
+       return super.toString();
+    }
 
     @Override
     public abstract ByteBuf retain(int increment);

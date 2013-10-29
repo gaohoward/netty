@@ -16,6 +16,7 @@
 
 package io.netty.buffer;
 
+import io.netty.util.DebugLogger;
 import io.netty.util.Recycler;
 import io.netty.util.internal.PlatformDependent;
 
@@ -29,6 +30,7 @@ import java.nio.channels.GatheringByteChannel;
 import java.nio.channels.ScatteringByteChannel;
 
 final class PooledUnsafeDirectByteBuf extends PooledByteBuf<ByteBuffer> {
+    private static final DebugLogger logg = DebugLogger.getLogger("test.log");
 
     private static final boolean NATIVE_ORDER = ByteOrder.nativeOrder() == ByteOrder.BIG_ENDIAN;
 
@@ -211,6 +213,7 @@ final class PooledUnsafeDirectByteBuf extends PooledByteBuf<ByteBuffer> {
     @Override
     public int readBytes(GatheringByteChannel out, int length)
             throws IOException {
+        logg.log(this + " readbytes, ch: " + out.getClass().getName());
         checkReadableBytes(length);
         int readBytes = getBytes(readerIndex, out, length, true);
         readerIndex += readBytes;

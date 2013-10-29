@@ -21,6 +21,7 @@ import io.netty.channel.ChannelException;
 import io.netty.channel.EventLoopException;
 import io.netty.channel.SingleThreadEventLoop;
 import io.netty.channel.nio.AbstractNioChannel.NioUnsafe;
+import io.netty.util.DebugLogger;
 import io.netty.util.internal.SystemPropertyUtil;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
@@ -48,6 +49,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *
  */
 public final class NioEventLoop extends SingleThreadEventLoop {
+    private static final DebugLogger logg = DebugLogger.getLogger("netty.log");
 
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(NioEventLoop.class);
 
@@ -298,11 +300,16 @@ public final class NioEventLoop extends SingleThreadEventLoop {
     @Override
     protected void run() {
         for (;;) {
+            logg.log("in NioEventLoop.run() loop");
             oldWakenUp = wakenUp.getAndSet(false);
+            logg.log("oldWakenUp: " + oldWakenUp);
             try {
                 if (hasTasks()) {
+                    logg.log("hasTasks, selectNow()");
                     selectNow();
+                    logg.log("done.");
                 } else {
+                    logg.log("select()");
                     select();
 
                     // 'wakenUp.compareAndSet(false, true)' is always evaluated
@@ -333,8 +340,11 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                     // the first case (BAD - wake-up required) and the second case
                     // (OK - no wake-up required).
 
+                    logg.log("wakenUp.get()");
                     if (wakenUp.get()) {
+                        logg.log("call selector.wakeup()");
                         selector.wakeup();
+                        logg.log("done.");
                     }
                 }
 
@@ -342,23 +352,34 @@ public final class NioEventLoop extends SingleThreadEventLoop {
 
                 final long ioStartTime = System.nanoTime();
                 needsToSelectAgain = false;
+
                 if (selectedKeys != null) {
+                    logg.log("calling proecessSelectedKeysOptim..");
                     processSelectedKeysOptimized(selectedKeys.flip());
+                    logg.log("done.");
                 } else {
+                    logg.log("calling processSelectKeysplain()");
                     processSelectedKeysPlain(selector.selectedKeys());
+                    logg.log("done.");
                 }
                 final long ioTime = System.nanoTime() - ioStartTime;
 
+                logg.log("runAllTasks()");
                 final int ioRatio = this.ioRatio;
                 runAllTasks(ioTime * (100 - ioRatio) / ioRatio);
 
+                logg.log("done.");
                 if (isShuttingDown()) {
+                    logg.log("shuttingdonw and closeall");
                     closeAll();
+                    logg.log("done.");
                     if (confirmShutdown()) {
+                        logg.log("shutdown confirmed, break.");
                         break;
                     }
                 }
             } catch (Throwable t) {
+                logg.log(this + " neetyerror " + t, false, t);
                 logger.warn("Unexpected exception in the selector loop.", t);
 
                 // Prevent possible consecutive immediate failures that lead to
@@ -471,6 +492,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
 
     private static void processSelectedKey(SelectionKey k, AbstractNioChannel ch) {
         final NioUnsafe unsafe = ch.unsafe();
+        logg.log("unsafe: " + unsafe.getClass().getName());
         if (!k.isValid()) {
             // close the channel if the key is not valid anymore
             unsafe.close(unsafe.voidPromise());
